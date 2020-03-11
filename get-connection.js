@@ -1,6 +1,13 @@
 var CONN_STRING = process.env.WABBITZZZ_URL || 'amqp://localhost';
 var amqplib = require('amqplib');
 var Promise = require('bluebird');
+var path = require('path');
+var projectName = path.basename(process.cwd());
+var DEFAULT_CONNECTION_PARAMS = {
+	clientProperties: {
+		information: projectName,
+	},
+};
 
 function _log(...args) {
 	if (global.logger && global.logger.warn) {
@@ -11,7 +18,7 @@ function _log(...args) {
 }
 
 function _getConnection(connString = CONN_STRING){
-	return Promise.resolve(amqplib.connect(connString))
+	return Promise.resolve(amqplib.connect(connString, DEFAULT_CONNECTION_PARAMS))
 		.then(function(conn) {
 			_log('WABBITZZZ CONNECTION OPENED');
 
