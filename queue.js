@@ -225,7 +225,9 @@ function Queue(connString, params){
 								// it is possible to apply the wrong label to a message if
 								// we do not specify the exchange
 								const isRightExchange = b.name === myMessage._exchange;
-								return b.isMatch && b.isMatch(routingKey) && isRightExchange;
+								if (!isRightExchange) return false;
+
+								return b.isMatch && b.isMatch(routingKey);
 							});
 							if (matchedBinding) {
 								myMessage._label = matchedBinding.label;
