@@ -13,7 +13,8 @@
     "amqplib": "0.5.3",
     "bluebird": "^3.4.1",
     "ezuuid": "0.0.1",
-    "lodash": "^4.17.20"
+    "lodash": "^4.17.20",
+    "short-id": "0.1.0-1"
   },
   "devDependencies": {
     "chai": "^1.9.1",
