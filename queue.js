@@ -70,8 +70,8 @@ function Queue(connString, params){
 	params = _.extend({}, DEFAULTS, params);
 
 	var name = params.name || ((params.namePrefix || '') + uuid()),
-		useErrorQueue = !!params.useErrorQueue,
-		errorQueueName = name + '_error',
+		useErrorQueue = !!params.useErrorQueue || _.isObject(params.errorQueue),
+		errorQueueName = _.get(params, 'errorQueue.name', `${name}_error`),
 		prefetchCount = params.prefetchCount|| 1,
 		ctag,
 		noAck = getNoAckParam(params),

@@ -189,6 +189,59 @@ describe('queue', function(){
 			});
 		});
 	});
+	it('should be able to push errors to custom error queue', function(done){
+		this.timeout(8000);
+		const errorQueueName = 'my_testing_errors';
+
+		function _readError(){
+			var errorQueue = new Queue({
+				name: errorQueueName,
+			});
+
+			errorQueue(function(msg, ack){
+				expect(msg._error).to.be.ok;
+				expect(msg._error.message).to.be.equal(errorKey);
+				ack();
+
+				errorQueue.destroy();
+				done();
+			});
+
+		}
+
+		var exchangeName = ezuuid();
+		var queueName = ezuuid();
+		var message = ezuuid();
+		var errorKey = ezuuid();
+
+		var exchange1 = new Exchange({name: exchangeName, autoDelete: true});
+
+		exchange1.on('ready', function(){
+			var queue = new Queue({
+				name: queueName,
+				autoDelete: true,
+				exclusive: true,
+				errorQueue: {
+					name: errorQueueName,
+				},
+				exchangeName: exchangeName,
+				ready: function(){
+					console.log('pooblishing');
+					exchange1.publish({ key: message });
+				},
+			});
+
+			queue(function(msg, ack){
+				if (msg.key !== message) return done('got a message I shouldnt have');
+				if (msg._exchange !== exchangeName) return done('bad _exchangeName');
+
+				ack(new Error(errorKey));
+
+				queue.destroy();
+				_readError();
+			});
+		});
+	});
 
 	it('should be able to bind with different routing keys', function(done){
 		this.timeout(5000);
