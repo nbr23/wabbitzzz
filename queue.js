@@ -1,4 +1,4 @@
-var uuid = require('short-id').generate
+var uuid = require('ezuuid');
 var _ = require('lodash');
 var defaultExchangePublish = require('./default-exchange-publish');
 var Promise = require('bluebird');
