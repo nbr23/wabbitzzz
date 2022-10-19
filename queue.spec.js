@@ -451,23 +451,27 @@ describe('queue', function(){
 			var myAttemptCount = 0;
 
 			queue(function(msg, ack){
-				expect(msg.id).to.be.equal(content1.id);
-				if (myAttemptCount === 0) {
-					expect(msg._attempt).to.be.not.ok;
-					myAttemptCount++;
-				} else {
-					expect(myAttemptCount++).to.be.equal(msg._attempt);
+				try {
+					expect(msg.id).to.be.equal(content1.id);
+					if (myAttemptCount === 0) {
+						expect(msg._attempt).to.be.not.ok;
+						myAttemptCount++;
+					} else {
+						expect(myAttemptCount++).to.be.equal(msg._attempt);
+					}
+
+
+					if (msg._attempt === 2) {
+						// we did it!
+						ack();
+						return done();
+					}
+
+					console.log('gonna retry the message!', msg._attempt);
+					ack('retry');
+				} catch (err) {
+					done(err);
 				}
-
-
-				if (msg._attempt === 2) {
-					// we did it!
-					ack();
-					return done();
-				}
-
-				console.log('gonna retry the message!', msg._attempt);
-				ack('retry');
 			});
 		});
 
@@ -502,19 +506,22 @@ describe('queue', function(){
 			var myAttemptCount = 0;
 
 			queue(function(msg, ack) {
-				console.log('processing attempt', msg._attempt || 0);
-				expect(msg.id).to.be.equal(content1.id);
+				try {
+					expect(msg.id).to.be.equal(content1.id);
 
-				if (myAttemptCount === 0) {
-					expect(msg._attempt).to.be.not.ok;
-				} else {
-					expect(myAttemptCount).to.be.equal(msg._attempt);
+					if (myAttemptCount === 0) {
+						expect(msg._attempt).to.be.not.ok;
+					} else {
+						expect(myAttemptCount).to.be.equal(msg._attempt);
+					}
+
+					myAttemptCount++;
+
+					expect(myAttemptCount).to.be.lte(maxAttempts);
+					ack('retry');
+				} catch (err) {
+					done(err);
 				}
-
-				myAttemptCount++;
-
-				expect(myAttemptCount).to.be.below(maxAttempts);
-				ack('retry');
 			});
 
 			errorQueue(function(msg, ack) {
@@ -558,20 +565,24 @@ describe('queue', function(){
 
 			var now = Date.now();
 			queue(function(msg, ack) {
-				var n = Date.now();
-				console.log('processing attempt', msg._attempt || 0, n - now);
-				expect(msg.id).to.be.equal(content1.id);
+				try {
+					var n = Date.now();
+					console.log('processing attempt', msg._attempt || 0, n - now);
+					expect(msg.id).to.be.equal(content1.id);
 
-				if (myAttemptCount === 0) {
-					expect(msg._attempt).to.be.not.ok;
-				} else {
-					expect(myAttemptCount).to.be.equal(msg._attempt);
+					if (myAttemptCount === 0) {
+						expect(msg._attempt).to.be.not.ok;
+					} else {
+						expect(myAttemptCount).to.be.equal(msg._attempt);
+					}
+
+					myAttemptCount++;
+
+					expect(myAttemptCount).to.be.lte(_.size(maxAttempts) + 1);
+					ack('retry');
+				} catch (err) {
+					done(err);
 				}
-
-				myAttemptCount++;
-
-				expect(myAttemptCount).to.be.below(_.size(maxAttempts) + 1);
-				ack('retry');
 			});
 
 			errorQueue(function(msg, ack) {
