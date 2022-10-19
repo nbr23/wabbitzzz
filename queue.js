@@ -206,6 +206,24 @@ function Queue(connString, params){
 					var myMessage;
 					try {
 						myMessage = JSON.parse(msg.content.toString());
+						var retryDelay = 250;
+						var maxAttempts;
+
+						if (attempts) {
+							myMessage._attempt = myMessage._attempt || 0;
+
+							if (_.isArray(attempts)) {
+								maxAttempts = _.size(attempts) + 1;
+								retryDelay = attempts[myMessage._attempt];
+							} else {
+								maxAttempts = +attempts || 2;
+							}
+
+							if ((maxAttempts - 1) <= myMessage._attempt) {
+								myMessage._isFinalAttempt = true;
+							}
+						}
+
 
 						if (msg.properties){
 							if (msg.properties.replyTo) myMessage._replyTo = msg.properties.replyTo;
@@ -251,20 +269,10 @@ function Queue(connString, params){
 						myMessage._error = _.extend({}, {message: error.message, stack: error.stack}, error);
 
 						var pushToRetryQueue = false;
-						var retryDelay = 250;
 
 						try {
 							if (attempts) {
 								myMessage._attempt = myMessage._attempt || 0;
-
-								var maxAttempts;
-
-								if (_.isArray(attempts)) {
-									maxAttempts = _.size(attempts) + 1;
-									retryDelay = attempts[myMessage._attempt];
-								} else {
-									maxAttempts = +attempts || 2;
-								}
 
 								myMessage._attempt += 1;
 

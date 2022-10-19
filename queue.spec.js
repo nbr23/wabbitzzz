@@ -518,6 +518,13 @@ describe('queue', function(){
 					myAttemptCount++;
 
 					expect(myAttemptCount).to.be.lte(maxAttempts);
+
+					if (myAttemptCount === maxAttempts) {
+						expect(msg._isFinalAttempt).to.be.true;
+					} else {
+						expect(msg._isFinalAttempt).to.be.not.ok;
+					}
+
 					ack('retry');
 				} catch (err) {
 					done(err);
@@ -547,6 +554,8 @@ describe('queue', function(){
 			});
 
 			var maxAttempts = [1000, 5000, 2000];
+			var maxAttemptCount = _.size(maxAttempts) + 1;
+
 			var queue = new Queue({
 				name: queueName,
 				useErrorQueue: true,
@@ -578,7 +587,14 @@ describe('queue', function(){
 
 					myAttemptCount++;
 
-					expect(myAttemptCount).to.be.lte(_.size(maxAttempts) + 1);
+					expect(myAttemptCount).to.be.lte(maxAttemptCount);
+
+					if (myAttemptCount === maxAttemptCount) {
+						expect(msg._isFinalAttempt).to.be.true;
+					} else {
+						expect(msg._isFinalAttempt).to.be.not.ok;
+					}
+
 					ack('retry');
 				} catch (err) {
 					done(err);
