@@ -58,6 +58,7 @@ function Exchange(connString, params){
 	EventEmitter.call(self);
 	params = _.extend({}, EXCHANGE_DEFAULTS, params);
 
+	var delayAssertChannel;
 	var confirmMode = !!params.confirm;
 	delete params.confirm;
 
@@ -126,36 +127,36 @@ function Exchange(connString, params){
 
 		publishOptions = _.extend({}, DELAYED_PUBLISH_DEFAULTS, publishOptions);
 
+		if (!delayAssertChannel) {
+			delayAssertChannel = _createChannel(connString);
+		}
 		msg._exchange = msg._exchange || exchangeName;
 		// negative delays break things
 		var delay = Math.max(publishOptions.delay, 1);
 
-		return new Promise(function(resolve, reject) {
-			var queueName = 'delay_' + exchangeName  +'_by_'+publishOptions.delay+'__'+publishOptions.key;
+		return delayAssertChannel
+			.then(function(chan) {
+				var queueName = 'delay_' + exchangeName  +'_by_'+publishOptions.delay+'__'+publishOptions.key;
 
-			var tmp = new queue({ connString })({
-				name: queueName,
-				exclusive: false,
-				autoDelete: false,
-				arguments: {
-					'x-dead-letter-exchange': exchangeName,
-					'x-dead-letter-routing-key': publishOptions.key,
-					'x-message-ttl': delay,
-				},
-				ready: function() {
-					defaultExchangePublish(connString, msg, { key: queueName })
-						.then(function() {
-							resolve(true);
-						})
-						.catch(function(err) {
-							reject(err);
-						})
-						.finally(function(){
-							tmp.close();
-						});
-				},
+				var options = {
+					exclusive: false,
+					autoDelete: false,
+					arguments: {
+						'x-dead-letter-exchange': exchangeName,
+						'x-dead-letter-routing-key': publishOptions.key,
+						'x-message-ttl': delay,
+					},
+				};
+
+				return chan.assertQueue(queueName, options)
+					.then(function() {
+						console.log('xxxxx');
+						return defaultExchangePublish(connString, msg, { key: queueName })
+							.then(function() {
+								return true;
+							});
+					});
 			});
-		});
 	};
 }
 
