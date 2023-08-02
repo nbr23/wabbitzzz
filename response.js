@@ -1,6 +1,5 @@
 var exchange = require('./exchange'),
 	_queue = require('./queue'),
-	ezuuid = require('ezuuid'),
 	_ = require('lodash');
 
 var DEFAULTS = {
@@ -33,33 +32,46 @@ var defaultExchangeDict = {
 	main: new MainExchange(),
 };
 
+var queueDict = {};
+var callbacks = {};
+
 function response (connString){
 	var options = createOptions.apply(null, _.toArray(arguments).slice(1)),
-		key = ezuuid(),
 		methodName = options.methodName,
-		queueName = options.appName + methodName + (options.shared ? '' : ('_' + key)) + '_rpc', // trailing _rpc important for policy regex
+		queueName = (options.appName + '_wabbitzzz_rpc').replace(/-/g, '_'), // trailing _rpc important for policy regex
 		Queue = _queue({ connString }),
+		queue = queueDict[connString];
+
+	if (!options.appName) {
+		throw new Error('appName is required in wabbitzzz/response');
+	}
+
+	if (!queue) {
 		queue = new Queue({
 			name: queueName,
 			ack: false,
 			exclusive: !options.shared,
 			autoDelete: true,
 			durable: false,
-			key: methodName,
-			exchangeName: '_rpc_send_direct',
+			bindings: [
+				{ name: '_rpc_send_direct', type: 'direct', key: 'fake_binding' }, // hack to make sure we assert the exchange
+			],
 			arguments: {
 				'x-message-ttl': options.ttl,
 			},
 		});
-
-	var listenOnly = false;
-
-	var fn = function(cb){
+		queueDict[connString] = queue;
 
 		queue.ready
 			.timeout(80000)
 			.then(function(){
 				queue(function(msg){
+					var cb = callbacks[msg._routingKey];
+					if (!cb){
+						console.error('no callback registered for ' + methodName);
+						return;
+					}
+
 					var done = function(err, res){
 						var publishOptions = {
 							key: msg._replyTo,
@@ -94,8 +106,19 @@ function response (connString){
 			})
 			.catch(function(err){
 				console.error(err);
-				cb(err);
 			});
+	}
+
+	var listenOnly = false;
+
+	var fn = function(cb){
+		queue.addBinding({ type: 'direct', name: '_rpc_send_direct', key: methodName })
+			.catch(err => {
+				console.log('failed to add binding for ', methodName, err);
+			});
+
+		callbacks[methodName] = cb;
+
 
 
 	};
@@ -104,13 +127,13 @@ function response (connString){
 	fn.ready = queue.ready;
 
 	return fn;
-};
+}
 
 module.exports = function (opt = {}) {
 	if (opt.connString && !defaultExchangeDict[opt.connString]) {
 		const AltExchange = exchange(opt);
 		defaultExchangeDict[opt.connString] = new AltExchange();
 	}
-	return _.partial(response, opt.connString)
-}
+	return _.partial(response, opt.connString);
+};
 module.exports.createOptions = createOptions;
