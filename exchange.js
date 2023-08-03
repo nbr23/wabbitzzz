@@ -23,6 +23,8 @@ var DELAYED_PUBLISH_DEFAULTS = {
 	key: '',
 };
 
+var assertedQueues = {};
+
 function _createChannel(connString, confirmMode){
 	return getConnection(connString)
 		.then(function(conn) {
@@ -126,36 +128,59 @@ function Exchange(connString, params){
 		}
 
 		publishOptions = _.extend({}, DELAYED_PUBLISH_DEFAULTS, publishOptions);
+		var skipQueueAssert = publishOptions.skipQueueAssert;
+		delete publishOptions.skipQueueAssert;
 
-		if (!delayAssertChannel) {
-			delayAssertChannel = _createChannel(connString);
-		}
 		msg._exchange = msg._exchange || exchangeName;
+
 		// negative delays break things
 		var delay = Math.max(publishOptions.delay, 1);
+		var queueName = 'delay_' + exchangeName  +'_by_'+publishOptions.delay+'__'+publishOptions.key;
+		var promise;
 
-		return delayAssertChannel
-			.then(function(chan) {
-				var queueName = 'delay_' + exchangeName  +'_by_'+publishOptions.delay+'__'+publishOptions.key;
+		if (skipQueueAssert) {
+			queueName += '_skip';
+		}
 
-				var options = {
-					exclusive: false,
-					autoDelete: false,
-					arguments: {
-						'x-dead-letter-exchange': exchangeName,
-						'x-dead-letter-routing-key': publishOptions.key,
-						'x-message-ttl': delay,
-					},
-				};
+		if (skipQueueAssert && assertedQueues[queueName]) {
+			promise = Promise.resolve();
+			console.log('SKIP assert', queueName);
+		} else {
+			if (!delayAssertChannel) {
+				delayAssertChannel = _createChannel(connString);
+			}
+			console.log('assert', queueName);
 
-				return chan.assertQueue(queueName, options)
-					.then(function() {
-						console.log('xxxxx');
-						return defaultExchangePublish(connString, msg, { key: queueName })
-							.then(function() {
-								return true;
-							});
-					});
+			promise = delayAssertChannel
+				.then(function(chan) {
+
+					var options = {
+						exclusive: false,
+						autoDelete: false,
+						arguments: {
+							'x-dead-letter-exchange': exchangeName,
+							'x-dead-letter-routing-key': publishOptions.key,
+							'x-message-ttl': delay,
+						},
+					};
+
+					// if we are going to skip the assert then we need to 
+					// not automatically delete the queue
+					if (skipQueueAssert) {
+						options.arguments['x-rabbit-pal-remove'] = 'ignore';
+					}
+
+					assertedQueues[queueName] = true;
+					return chan.assertQueue(queueName, options);
+				});
+		}
+
+		return promise
+			.then(function() {
+				return defaultExchangePublish(connString, msg, { key: queueName });
+			})
+			.then(function() {
+				return true;
 			});
 	};
 }
