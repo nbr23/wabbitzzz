@@ -69,7 +69,7 @@ function _patternToMatcher(pattern) {
 function Queue(connString, params){
 	params = _.extend({}, DEFAULTS, params);
 
-	var name = params.name || ((params.namePrefix || '') + uuid()),
+	var name = params.name || ((params.namePrefix || '') + _ + uuid()),
 		useErrorQueue = !!params.useErrorQueue || _.isObject(params.errorQueue),
 		errorQueueName = _.get(params, 'errorQueue.name', `${name}_error`),
 		prefetchCount = params.prefetchCount|| 1,
