@@ -1,6 +1,8 @@
-var Queue = require('./queue')(),
-	Exchange = require('./exchange')(),
-	ezuuid = require('ezuuid');
+/* eslint-env mocha */
+
+const Queue = require('./queue')();
+const Exchange = require('./exchange')();
+const ezuuid = require('ezuuid');
 
 describe('exchange', function(){
 	it('should be able to publish to the default exchange', function(done){
@@ -15,12 +17,9 @@ describe('exchange', function(){
 				autoDelete: true,
 				exclusive: true,
 				name: queueName,
-				ready: function(){
-					defaultExchanage.publish(
-							{message:message},
-							{key:queueName}
-						);
-				}
+				ready: function() {
+					defaultExchanage.publish({ message }, { key: queueName });
+				},
 			});
 
 			queue(function(msg, ack){
@@ -41,10 +40,10 @@ describe('exchange', function(){
 
 		var beginTicks;
 
-		var exchange = new Exchange({
-				autoDelete: true,
-				name: exchangeName
-			});
+		const exchange = new Exchange({
+			autoDelete: true,
+			name: exchangeName,
+		});
 
 		exchange.on('ready', function(){
 			var queue = new Queue({
@@ -54,7 +53,7 @@ describe('exchange', function(){
 				ready: function(){
 					beginTicks = Date.now();
 					exchange.delayedPublish({message: message}, {delay:3100});
-				}
+				},
 			});
 
 			queue(function(msg, ack){
@@ -81,11 +80,11 @@ describe('exchange', function(){
 
 		var beginTicks;
 
-		var exchange = new Exchange({
-				autoDelete: true,
-				type: 'topic',
-				name: exchangeName
-			});
+		const exchange = new Exchange({
+			autoDelete: true,
+			type: 'topic',
+			name: exchangeName,
+		});
 
 		exchange.on('ready', function(){
 			var queue = new Queue({
@@ -96,7 +95,7 @@ describe('exchange', function(){
 				ready: function(){
 					beginTicks = Date.now();
 					exchange.delayedPublish({message: message}, {delay:3100, key: '111' });
-				}
+				},
 			});
 
 			queue(function(msg, ack){
@@ -123,11 +122,11 @@ describe('exchange', function(){
 
 		var beginTicks;
 
-		var exchange = new Exchange({
-				autoDelete: true,
-				type: 'direct',
-				name: exchangeName
-			});
+		const exchange = new Exchange({
+			autoDelete: true,
+			type: 'direct',
+			name: exchangeName,
+		});
 
 		exchange.on('ready', function(){
 			var queue = new Queue({
@@ -137,8 +136,8 @@ describe('exchange', function(){
 				exchangeNames: [exchangeName],
 				ready: function(){
 					beginTicks = Date.now();
-					exchange.delayedPublish({message: message}, {delay:3100, key: '111' });
-				}
+					exchange.delayedPublish({ message }, { delay:3100, key: '111' });
+				},
 			});
 
 			queue(function(msg, ack){
@@ -165,11 +164,11 @@ describe('exchange', function(){
 
 		var beginTicks;
 
-		var exchange = new Exchange({
-				autoDelete: true,
-				type: 'x-lvc',
-				name: exchangeName
-			});
+		const exchange = new Exchange({
+			autoDelete: true,
+			type: 'x-lvc',
+			name: exchangeName,
+		});
 
 		exchange.on('ready', function(){
 			var queue = new Queue({
@@ -179,8 +178,8 @@ describe('exchange', function(){
 				exchangeNames: [exchangeName],
 				ready: function(){
 					beginTicks = Date.now();
-					exchange.delayedPublish({message: message}, {delay:3100, key: 'fun' });
-				}
+					exchange.delayedPublish({ message }, {delay:3100, key: 'fun' });
+				},
 			});
 
 			queue(function(msg, ack){
@@ -207,7 +206,7 @@ describe('exchange', function(){
 			exchange = new Exchange({
 				name: exchangeName,
 				autoDelete: true,
-				confirm:true
+				confirm: true,
 			});
 
 		var publishConfirmed = false;
@@ -218,10 +217,9 @@ describe('exchange', function(){
 				exclusive: true,
 				exchangeNames: [exchangeName],
 				ready: function(){
-					exchange.publish({message: message}, {}, function(){
-							publishConfirmed = true;
-						});
-				}
+					const fn = () => publishConfirmed = true;
+					exchange.publish({message }, {}, fn);
+				},
 			});
 
 			queue(function(msg, ack){
@@ -248,7 +246,7 @@ describe('exchange', function(){
 			exchange = new Exchange({
 				name: exchangeName,
 				autoDelete: true,
-				confirm:true
+				confirm:true,
 			});
 
 		var publishConfirmed1 = false;
@@ -266,7 +264,7 @@ describe('exchange', function(){
 					exchange.publish({message: message}, {}, function(){
 						publishConfirmed2 = true;
 					});
-				}
+				},
 			});
 
 			queue(function(msg, ack){
@@ -281,7 +279,7 @@ describe('exchange', function(){
 					if (publishConfirmed1 && publishConfirmed2){
 						ack();
 						done();
-						queue.close()
+						queue.close();
 					}
 				}, 1000);
 			});
