@@ -74,7 +74,7 @@ function response (connString){
 	let getChannel = channelDict[connString];
 
 	if (!getChannel) {
-		getChannel = _createChannel(connString)
+		getChannel = channelDict[connString] = _createChannel(connString)
 			.then(async function(chan){
 				await chan.assertExchange('_rpc_send_direct', 'direct', {durable: true});
 				await chan.prefetch(100);
