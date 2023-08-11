@@ -1,14 +1,40 @@
-var exchange = require('./exchange'),
-	_queue = require('./queue'),
-	_ = require('lodash');
+const exchange = require('./exchange');
+const _ = require('lodash');
+const getConnection = require('./get-connection');
 
-var DEFAULTS = {
+const DEFAULTS = {
 	appName: '',
 	ttl: 10000,
 	shared: false,
 };
 
-var exchanges = {};
+function _parseJson(content){
+	try {
+		return JSON.parse(content.toString());
+	} catch (e){
+		console.error(`wabbitzzz rpc error parsing json:`, e);
+		return {};
+	}
+}
+
+function _deserializeMessage(rawMsg) {
+	const { properties = {}, content } = rawMsg;
+	let { contentType = 'application/json' } = properties;
+	contentType = contentType.toLowerCase();
+
+	switch (contentType) {
+		case 'application/json': {
+			return _parseJson(content);
+		}
+		default: {
+			console.log(`wabbitzzz rpc unknown content type: ${contentType}. defaulting to json`);
+			return _parseJson(content);
+		}
+	}
+}
+
+
+
 function createOptions(methodName, options){
 	switch (typeof methodName){
 		case 'string':
@@ -32,67 +58,72 @@ var defaultExchangeDict = {
 	main: new MainExchange(),
 };
 
-var queueDict = {};
-var callbacks = {};
+function _createChannel(connString){
+	return getConnection(connString)
+		.then(function(conn) {
+			return conn.createChannel();
+		});
+}
+var channelDict = {};
 
 function response (connString){
-	var options = createOptions.apply(null, _.toArray(arguments).slice(1)),
-		methodName = options.methodName,
-		queueName = (options.appName + '_wabbitzzz_rpc').replace(/-/g, '_'), // trailing _rpc important for policy regex
-		Queue = _queue({ connString }),
-		queue = queueDict[connString];
+	var options = createOptions.apply(null, _.toArray(arguments).slice(1));
+	const { appName = 'none', methodName } = options;
+	const queueName = `${appName}_${methodName}___rpc`.replace(/-/g, '_'); // trailing _rpc important for policy regex
 
-	if (!options.appName) {
-		throw new Error('appName is required in wabbitzzz/response');
+	let getChannel = channelDict[connString];
+
+	if (!getChannel) {
+		getChannel = _createChannel(connString)
+			.then(async function(chan){
+				await chan.assertExchange('_rpc_send_direct', 'direct', {durable: true});
+				await chan.prefetch(100);
+				return chan;
+			})
+			.catch(function(err){
+				console.error(`wabbitzzz rpc setup error:`, err);
+			});
 	}
+	
+	getChannel
+		.then(async chan => {
+			const queueOptions = {
+				durable: false,
+				autoDelete: true,
+				arguments: {
+					'x-message-ttl': options.ttl,
+				},
+			};
 
-	if (!queue) {
-		queue = new Queue({
-			name: queueName,
-			ack: false,
-			exclusive: !options.shared,
-			autoDelete: true,
-			durable: false,
-			bindings: [
-				{ name: '_rpc_send_direct', type: 'direct', key: 'fake_binding' }, // hack to make sure we assert the exchange
-			],
-			arguments: {
-				'x-message-ttl': options.ttl,
-			},
+			await chan.assertQueue(queueName, queueOptions);
+		})
+		.catch(function(err){
+			console.error(`wabbitzzz rpc setup error:`, err);
 		});
-		queueDict[connString] = queue;
 
-		queue.ready
-			.timeout(80000)
-			.then(function(){
-				queue(function(msg){
-					var cb = callbacks[msg._routingKey];
-					if (!cb){
-						console.error('no callback registered for ' + methodName);
-						return;
-					}
-
-					var done = function(err, res){
-						var publishOptions = {
-							key: msg._replyTo,
+	return async (cb) =>{
+		await getChannel
+			.then(async function(chan){
+				await chan.consume(queueName, (rawMsg) => {
+					const done = function(err, res){
+						const publishOptions = {
 							persistent: false,
-							correlationId: msg._correlationId,
+							key: rawMsg.properties.replyTo,
+							correlationId: rawMsg.properties.correlationId,
 						};
 
-						if (!listenOnly){
-							const conn = connString ? connString : 'main';
-							if (err){
-								return defaultExchangeDict[conn].publish({
-									_rpcError:true,
-									_message: err.toString(),
-								}, publishOptions);
-							} else {
-								return defaultExchangeDict[conn].publish(res, publishOptions);
-							}
+						const conn = connString ? connString : 'main';
+						if (err){
+							return defaultExchangeDict[conn].publish({
+								_rpcError: true,
+								_message: err.toString(),
+							}, publishOptions);
+						} else {
+							return defaultExchangeDict[conn].publish(res, publishOptions);
 						}
 					};
-					msg._listenOnly = listenOnly;
 
+					const msg = _deserializeMessage(rawMsg);
 					try {
 						// this is not strictly necessary, but helps avoid bugs for the moment
 						delete msg._exchange;
@@ -103,30 +134,13 @@ function response (connString){
 						cb(err);
 					}
 				});
-			})
-			.catch(function(err){
+
+				await chan.bindQueue(queueName, '_rpc_send_direct', methodName);
+			}, { noAck: true })
+			.catch(err => {
 				console.error(err);
 			});
-	}
-
-	var listenOnly = false;
-
-	var fn = function(cb){
-		queue.addBinding({ type: 'direct', name: '_rpc_send_direct', key: methodName })
-			.catch(err => {
-				console.log('failed to add binding for ', methodName, err);
-			});
-
-		callbacks[methodName] = cb;
-
-
-
 	};
-	fn.enable =function(){ listenOnly = false; };
-	fn.disable = function(){ listenOnly = true; };
-	fn.ready = queue.ready;
-
-	return fn;
 }
 
 module.exports = function (opt = {}) {
