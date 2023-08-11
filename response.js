@@ -133,10 +133,10 @@ function response (connString){
 						console.error(err);
 						cb(err);
 					}
-				});
+				}, { noAck: true });
 
 				await chan.bindQueue(queueName, '_rpc_send_direct', methodName);
-			}, { noAck: true })
+			})
 			.catch(err => {
 				console.error(err);
 			});
