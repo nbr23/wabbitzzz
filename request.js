@@ -118,10 +118,10 @@ function request (connString){
 				console.error(err);
 			});
 	};
-};
+}
 
 module.exports = function (opt = {}) {
 	return _.partial(request, opt.connString);
-}
+};
 
 module.exports.createOptions = createOptions;

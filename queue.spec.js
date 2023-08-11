@@ -82,7 +82,7 @@ describe('queue', function(){
 				var queue = new Queue({
 					autoDelete: true,
 					exclusive: true,
-					exchangeNames: [exchangeName1, exchangeName2]
+					exchangeNames: [exchangeName1, exchangeName2],
 				});
 
 				var gotMessage1 = false,
@@ -173,7 +173,6 @@ describe('queue', function(){
 				useErrorQueue: true,
 				exchangeName: exchangeName,
 				ready: function(){
-					console.log('pooblishing');
 					exchange1.publish({ key: message });
 				},
 			});
@@ -226,7 +225,6 @@ describe('queue', function(){
 				},
 				exchangeName: exchangeName,
 				ready: function(){
-					console.log('pooblishing');
 					exchange1.publish({ key: message });
 				},
 			});
@@ -624,7 +622,7 @@ describe('queue', function(){
 				autoDelete: true,
 				exclusive: true,
 				bindings: [
-					{ name: exchangeName, key: 'mike.*', label: 'one', },
+					{ name: exchangeName, key: 'mike.*', label: 'one' },
 					{ name: exchangeName, key: 'fred.*' , label: 'two' },
 				],
 				ready: function(){
@@ -672,7 +670,7 @@ describe('queue', function(){
 				{
 					name: exchange2Name,
 					type: 'fanout',
-				}
+				},
 			],
 			ready: function () {
 				exchange2.publish({ bananas: true });

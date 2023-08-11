@@ -1,7 +1,6 @@
 var Promise = require('bluebird'),
 	util = require('util'),
 	getConnection = require('./get-connection'),
-	queue = require('./queue'),
 	_ = require('lodash'),
 	EventEmitter = require('events').EventEmitter,
 	defaultExchangePublish = require('./default-exchange-publish');
@@ -89,7 +88,7 @@ function Exchange(connString, params){
 		});
 
 	property('ready', {
-		get: function(){ return getChannel; }
+		get: function(){ return getChannel; },
 	});
 
 	this.publish = function(msg, publishOptions, cb){

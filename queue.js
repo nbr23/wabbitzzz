@@ -412,10 +412,10 @@ function Queue(connString, params){
 
 	var property = Object.defineProperty.bind(Object, receiveFunc);
 	property('ready', {
-		get: function(){ return queuePromise; }
+		get: function(){ return queuePromise; },
 	});
 	property('started', {
-		get: function(){ return queuePromise; }
+		get: function(){ return queuePromise; },
 	});
 
 	return receiveFunc;
@@ -423,4 +423,4 @@ function Queue(connString, params){
 
 module.exports = function (opt = {}) {
 	return _.partial(Queue, opt.connString);
-}
+};
