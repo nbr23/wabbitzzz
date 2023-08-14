@@ -6,9 +6,7 @@ var PUBLISH_DEFAULTS = {
 	contentType: 'application/json',
 };
 
-var channelDict = {
-	main: getChannel(),
-};
+const channelDict = {};
 
 function getChannel (connString) {
 	return getConnection(connString)

@@ -24,9 +24,7 @@ function initChannel (connString) {
 		});
 }
 
-const channelDict = {
-	main: initChannel(),
-};
+const channelDict = {};
 
 function handleResponse(connString, response){
 	if (!response || !response.properties || !response.properties.correlationId){
