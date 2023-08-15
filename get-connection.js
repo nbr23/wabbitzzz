@@ -1,11 +1,16 @@
+const { version } = require('./package.json');
 var CONN_STRING = process.env.WABBITZZZ_URL || 'amqp://localhost';
 var amqplib = require('amqplib');
 var Promise = require('bluebird');
 var path = require('path');
 var projectName = path.basename(process.cwd());
-var DEFAULT_CONNECTION_PARAMS = {
+
+const DEFAULT_CONNECTION_PARAMS = {
 	clientProperties: {
+		connection_name: process.env.npm_package_name,
 		information: projectName,
+		product: `wabbitzzz ${version}`,
+		version: '',
 	},
 };
 
