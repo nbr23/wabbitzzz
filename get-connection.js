@@ -7,7 +7,7 @@ var projectName = path.basename(process.cwd());
 
 const DEFAULT_CONNECTION_PARAMS = {
 	clientProperties: {
-		connection_name: process.env.npm_package_name,
+		connection_name: process.env.APP_NAME || process.env.npm_package_name,
 		information: projectName,
 		product: `wabbitzzz ${version}`,
 		version: '',
