@@ -1,39 +1,13 @@
 const exchange = require('./exchange');
 const _ = require('lodash');
 const getConnection = require('./get-connection');
+const { deserialize } = require('./serializer.js');
 
 const DEFAULTS = {
 	appName: '',
 	ttl: 10000,
 	shared: false,
 };
-
-function _parseJson(content){
-	try {
-		return JSON.parse(content.toString());
-	} catch (e){
-		console.error(`wabbitzzz rpc error parsing json:`, e);
-		return {};
-	}
-}
-
-function _deserializeMessage(rawMsg) {
-	const { properties = {}, content } = rawMsg;
-	let { contentType = 'application/json' } = properties;
-	contentType = contentType.toLowerCase();
-
-	switch (contentType) {
-		case 'application/json': {
-			return _parseJson(content);
-		}
-		default: {
-			console.log(`wabbitzzz rpc unknown content type: ${contentType}. defaulting to json`);
-			return _parseJson(content);
-		}
-	}
-}
-
-
 
 function createOptions(methodName, options){
 	switch (typeof methodName){
@@ -123,7 +97,14 @@ function response (connString){
 						}
 					};
 
-					const msg = _deserializeMessage(rawMsg);
+					let msg;
+					try {
+						msg = deserialize(rawMsg);
+					} catch (err){
+						msg = {};
+						console.log(`deserialization error while processing ${methodName}`);
+					}
+
 					try {
 						// this is not strictly necessary, but helps avoid bugs for the moment
 						delete msg._exchange;

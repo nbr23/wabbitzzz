@@ -5,6 +5,8 @@ var Promise = require('bluebird'),
 	EventEmitter = require('events').EventEmitter,
 	defaultExchangePublish = require('./default-exchange-publish');
 
+const { serialize, deserialize } = require('./serializer.js');
+
 var EXCHANGE_DEFAULTS = {
 	type: 'fanout',
 	autoDelete: false,
@@ -97,15 +99,18 @@ function Exchange(connString, params){
 		return getChannel
 			.then(function(chan){
 
-				var options = _.extend({}, PUBLISH_DEFAULTS, publishOptions);
-				var key = (options.key || 'blank').toString();
+				const options = _.extend({}, PUBLISH_DEFAULTS, publishOptions);
+				const key = (options.key || 'blank').toString();
+
+				const { contentType = 'application/json' } = options;
+				const buf = serialize(msg, contentType);
 
 				delete options.key;
 
 				msg._exchange = msg._exchange || exchangeName;
 
 				if (confirmMode){
-					chan.publish(exchangeName, key, Buffer(JSON.stringify(msg)), options);
+					chan.publish(exchangeName, key, buf, options);
 					return chan.waitForConfirms()
 						.then(function(){
 							if (_.isFunction(cb)) cb();
@@ -113,7 +118,7 @@ function Exchange(connString, params){
 						});
 				}
 
-				return chan.publish(exchangeName, key, Buffer(JSON.stringify(msg)), options);
+				return chan.publish(exchangeName, key, buf, options);
 			});
 	};
 

@@ -1,10 +1,11 @@
-var _ = require('lodash');
-var getConnection = require('./get-connection');
+const _ = require('lodash');
+const getConnection = require('./get-connection');
 
-var PUBLISH_DEFAULTS = {
+const PUBLISH_DEFAULTS = {
 	persistent: false,
 	contentType: 'application/json',
 };
+const { serialize } = require('./serializer.js');
 
 const channelDict = {};
 
@@ -29,6 +30,7 @@ function _publish(connString, msg, options){
 			delete options.key;
 			delete options.delay;
 
+			const buf = serialize(msg, options.contentType);
 			if (delay) {
 				const queueOptions = {
 					arguments: {
@@ -41,12 +43,12 @@ function _publish(connString, msg, options){
 				const delayQueueName = `delay_default_${key}_${delay}`;
 				return chan.assertQueue(delayQueueName, queueOptions)
 					.then(() => {
-						chan.publish('', delayQueueName, Buffer(JSON.stringify(msg)), options);
+						chan.publish('', delayQueueName, buf, options);
 						return chan.waitForConfirms();
 					});
 			} else {
 
-				chan.publish('', key, Buffer(JSON.stringify(msg)), options);
+				chan.publish('', key, buf, options);
 				return chan.waitForConfirms();
 			}
 

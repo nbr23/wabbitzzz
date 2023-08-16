@@ -36,6 +36,33 @@ describe('queue', function(){
 
 		});
 	});
+	it('should be able to recieve messagepack messages', async function(){
+		const d = Promise.defer();
+		const exchangeName = ezuuid();
+
+		const exchange1 = new Exchange({
+			name: exchangeName,
+			type: 'direct',
+		});
+
+		const queue = new Queue({
+			autoDelete: true,
+			name: `queue_${exchangeName}`,
+			bindings: [
+				{ name: exchangeName, type: 'direct', key: 'what' },
+			],
+		});
+
+		await queue((msg, ack) => {
+			expect(msg.message).to.eql('hey');
+			d.resolve(true);
+			ack();
+		});
+
+		await exchange1.publish({ message: 'hey' }, { key: 'what', contentType: 'application/json' });
+
+		return d.promise;
+	});
 
 	it('should be able to bind to a single exchange with the exchangeNames property', function(done){
 		this.timeout(5000);
@@ -369,9 +396,7 @@ describe('queue', function(){
 
 			messageCount++;
 
-			console.log('hi');
 			expect(msg.now).to.be.equal(content.now);
-			console.log('still here');
 
 			queue.addBinding({ name: coolExchangeName, key: '1111' })
 				.then(() => coolExchange.publish(content2, { key: '1111' }))
@@ -465,7 +490,6 @@ describe('queue', function(){
 						return done();
 					}
 
-					console.log('gonna retry the message!', msg._attempt);
 					ack('retry');
 				} catch (err) {
 					done(err);
@@ -574,7 +598,6 @@ describe('queue', function(){
 			queue(function(msg, ack) {
 				try {
 					var n = Date.now();
-					console.log('processing attempt', msg._attempt || 0, n - now);
 					expect(msg.id).to.be.equal(content1.id);
 
 					if (myAttemptCount === 0) {

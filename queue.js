@@ -1,8 +1,9 @@
-var uuid = require('ezuuid');
-var _ = require('lodash');
-var defaultExchangePublish = require('./default-exchange-publish');
-var Promise = require('bluebird');
-var getConnection = require('./get-connection');
+const uuid = require('ezuuid');
+const _ = require('lodash');
+const defaultExchangePublish = require('./default-exchange-publish');
+const Promise = require('bluebird');
+const getConnection = require('./get-connection');
+const { deserialize } = require('./serializer.js');
 
 var EXCHANGE_ATTRIBUTE_NAMES = [
 	'durable',
@@ -181,7 +182,7 @@ function Queue(connString, params){
 		});
 
 	var receiveFunc = function(fn){
-		queuePromise
+		return queuePromise
 			.then(function(chan){
 				if (!chan) {
 					_log('warn', `missing channel for queue ${name} not consuming`);
@@ -205,7 +206,9 @@ function Queue(connString, params){
 					}
 					var myMessage;
 					try {
-						myMessage = JSON.parse(msg.content.toString());
+
+						myMessage = deserialize(msg);
+
 						var retryDelay = 250;
 						var maxAttempts;
 

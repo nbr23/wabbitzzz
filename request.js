@@ -1,6 +1,7 @@
-var getConnection = require('./get-connection');
-var ezuuid = require('ezuuid');
-var _ = require('lodash');
+const getConnection = require('./get-connection');
+const ezuuid = require('ezuuid');
+const _ = require('lodash');
+const { deserialize } = require('./serializer.js');
 
 function initChannel (connString) {
 	return getConnection(connString)
@@ -31,9 +32,9 @@ function handleResponse(connString, response){
 		return console.dir('error, bad response.', response);
 	}
 
-	var conn = connString ? connString : 'main';
-	var correlationId = response.properties.correlationId;
-	var requestEntry = requestLookup[conn][correlationId];
+	const conn = connString ? connString : 'main';
+	const correlationId = response.properties.correlationId;
+	const requestEntry = requestLookup[conn][correlationId];
 
 	if (!requestEntry){
 		return console.dir('error, unknown correlationId.');
@@ -41,7 +42,7 @@ function handleResponse(connString, response){
 
 	clearTimeout(requestEntry.timeout);
 
-	var msg = JSON.parse(response.content.toString());
+	const msg = deserialize(response);
 	delete requestLookup[conn][correlationId];
 
 	if (msg && msg._rpcError) {
