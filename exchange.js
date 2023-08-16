@@ -102,12 +102,13 @@ function Exchange(connString, params){
 				const options = _.extend({}, PUBLISH_DEFAULTS, publishOptions);
 				const key = (options.key || 'blank').toString();
 
+				msg._exchange = msg._exchange || exchangeName;
+
 				const { contentType = 'application/json' } = options;
 				const buf = serialize(msg, contentType);
 
 				delete options.key;
 
-				msg._exchange = msg._exchange || exchangeName;
 
 				if (confirmMode){
 					chan.publish(exchangeName, key, buf, options);
