@@ -77,7 +77,8 @@ function Queue(connString, params){
 		ctag,
 		noAck = getNoAckParam(params),
 		attempts = params.attempts,
-		closing = false;
+		closing = false,
+		exclusive = params.exclusive || false;
 
 
 	if (noAck) {
@@ -117,6 +118,7 @@ function Queue(connString, params){
 	delete params.key;
 	delete params.noAck;
 	delete params.ack;
+	delete params.exclusive;
 
 	function bindQueue(chan, bindings){
 		return _.chain(bindings)
@@ -193,6 +195,11 @@ function Queue(connString, params){
 					_log('warn', `channel for queue ${name} was closed before we could start consuming`, 'HEY');
 					return false;
 				}
+
+				const consumerOptions = {
+					exclusive,
+					noAck,
+				};
 
 				return chan.consume(name, function(msg) {
 					if (!msg){
@@ -338,7 +345,7 @@ function Queue(connString, params){
 							done(e.toString());
 						}
 					}
-				}, { noAck: noAck });
+				}, consumerOptions);
 			})
 			.then(function(res){
 				ctag = res.consumerTag;
