@@ -5,7 +5,7 @@ var Promise = require('bluebird'),
 	EventEmitter = require('events').EventEmitter,
 	defaultExchangePublish = require('./default-exchange-publish');
 
-const { serialize, deserialize } = require('./serializer.js');
+const { serialize } = require('./serializer.js');
 
 var EXCHANGE_DEFAULTS = {
 	type: 'fanout',
