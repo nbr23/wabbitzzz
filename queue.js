@@ -80,6 +80,9 @@ function Queue(connString, params){
 		closing = false,
 		exclusive = params.exclusive || false;
 
+	if (exclusive) {
+		params.durable = false;
+	}
 
 	if (noAck) {
 		prefetchCount = 0;
