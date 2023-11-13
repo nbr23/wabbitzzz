@@ -15,7 +15,7 @@ var EXCHANGE_DEFAULTS = {
 };
 
 var PUBLISH_DEFAULTS = {
-	persistent: true,
+	persistent: false,
 	contentType: 'application/json',
 };
 
