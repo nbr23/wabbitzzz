@@ -11,8 +11,14 @@ const channelDict = {};
 
 function getChannel (connString) {
 	return getConnection(connString)
-		.then(function(conn){
-			return conn.createConfirmChannel();
+		.then(async function(conn){
+			const channel = await conn.createConfirmChannel();
+
+			channel.on('error', function(err){
+				console.error('wabbitzzz default-exchange-publish channel error', err);
+			});
+
+			return channel;
 		});
 }
 
@@ -21,6 +27,7 @@ function _publish(connString, msg, options){
 	if (!channelDict[conn]) {
 		channelDict[conn] = getChannel(connString);
 	}
+
 	return channelDict[conn]
 		.then(function(chan){
 			var key = options.key;
