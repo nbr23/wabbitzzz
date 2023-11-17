@@ -52,14 +52,13 @@ function _assertExchange(channel, params) {
 		});
 }
 
-var channelDict = {
-	main: _createChannel(),
-};
+const channelDict = {};
 
 function Exchange(connString, params){
 	var self = this;
 	EventEmitter.call(self);
 	params = _.extend({}, EXCHANGE_DEFAULTS, params);
+	connString = connString || 'main';
 
 	var delayAssertChannel;
 	var confirmMode = !!params.confirm;
@@ -69,10 +68,8 @@ function Exchange(connString, params){
 	var getChannel;
 	if (confirmMode) {
 		getChannel = _createChannel(connString, true);
-	} else if (connString) {
-		getChannel = channelDict[connString];
 	} else {
-		getChannel = channelDict.main;
+		getChannel = channelDict[connString];
 	}
 
 	getChannel = getChannel
@@ -149,12 +146,12 @@ function Exchange(connString, params){
 
 		if (skipQueueAssert && assertedQueues[queueName]) {
 			promise = Promise.resolve();
-			console.log('SKIP assert', queueName);
+			// console.log('SKIP assert', queueName);
 		} else {
 			if (!delayAssertChannel) {
 				delayAssertChannel = _createChannel(connString);
 			}
-			console.log('assert', queueName);
+			// console.log('assert', queueName);
 
 			promise = delayAssertChannel
 				.then(function(chan) {
@@ -193,8 +190,10 @@ function Exchange(connString, params){
 util.inherits(Exchange, EventEmitter);
 
 module.exports = function (opt = {}) {
-	if (opt.connString && !channelDict[opt.connString]) {
-		channelDict[opt.connString] = _createChannel(opt.connString);
+	const { connString = 'main' } = opt;
+
+	if (!channelDict[connString]) {
+		channelDict[connString] = _createChannel(connString);
 	}
 
 	return _.partial(Exchange, opt.connString);
