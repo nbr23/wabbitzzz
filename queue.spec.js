@@ -217,7 +217,7 @@ describe('queue', function(){
 	});
 	it('should be able to push errors to custom error queue', function(done){
 		this.timeout(8000);
-		const errorQueueName = 'my_testing_errors';
+		const errorQueueName = ezuuid();
 
 		function _readError(){
 			var errorQueue = new Queue({
