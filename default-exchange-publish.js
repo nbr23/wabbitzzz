@@ -7,7 +7,9 @@ const PUBLISH_DEFAULTS = {
 };
 const { serialize } = require('./serializer.js');
 
-const channelDict = {};
+var channelDict = {
+	main: getChannel(),
+};
 
 function getChannel (connString) {
 	return getConnection(connString)
