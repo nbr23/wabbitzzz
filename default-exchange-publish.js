@@ -43,15 +43,27 @@ function _publish(connString, msg, options){
 				const delayQueueName = `delay_default_${key}_${delay}`;
 				return chan.assertQueue(delayQueueName, queueOptions)
 					.then(() => {
-						chan.publish('', delayQueueName, buf, options);
-						return chan.waitForConfirms();
+						return new Promise((resolve, reject) => {
+							return chan.sendToQueue(delayQueueName, buf, options, function(err, ok) {
+								if (err) {
+									return reject(err);
+								}
+
+								return resolve(ok);
+							});
+						});
 					});
 			} else {
+				return new Promise((resolve, reject) => {
+					return chan.sendToQueue(key, buf, options, function(err, ok) {
+						if (err) {
+							return reject(err);
+						}
 
-				chan.publish('', key, buf, options);
-				return chan.waitForConfirms();
+						return resolve(ok);
+					});
+				});
 			}
-
 		})
 		.timeout(20 * 1000);
 }
