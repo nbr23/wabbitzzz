@@ -37,11 +37,6 @@ function assertQueue(connString, queueName, exchangeNames, params){
 			return conn.createChannel();
 		})
 		.then(function(chan){
-
-			chan.on('error', function(err){
-				console.error('wabbitzzz channel error', queueName, err);
-			});
-
 			return chan.assertQueue(queueName, params)
 				.then(_.constant(chan));
 		});

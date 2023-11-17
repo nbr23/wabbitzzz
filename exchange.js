@@ -73,13 +73,7 @@ function Exchange(connString, params){
 	}
 
 	getChannel = getChannel
-		.then(async function(channel) {
-			channel.on('error', function(err) {
-				console.error('wabbitzzz exchange channel error', exchangeName, err);
-			});
-
-			return _assertExchange(channel, params);
-		});
+		.then(function(c) { return _assertExchange(c, params); });
 
 	var property = Object.defineProperty.bind(Object, self);
 
@@ -88,7 +82,8 @@ function Exchange(connString, params){
 			self.emit('ready');
 		})
 		.catch(function(err){
-			console.error('error creating exchange', err);
+			console.log('error creating exchange');
+			console.log(err);
 		});
 
 	property('ready', {
