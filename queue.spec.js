@@ -174,10 +174,10 @@ describe('queue', function(){
 				name: queueName +  '_error',
 			});
 
-			errorQueue(function(msg, ack){
+			errorQueue(async function(msg, ack){
 				expect(msg._error).to.be.ok;
 				expect(msg._error.message).to.be.equal(errorKey);
-				ack();
+				await ack();
 
 				errorQueue.destroy();
 				done();
@@ -204,11 +204,11 @@ describe('queue', function(){
 				},
 			});
 
-			queue(function(msg, ack){
+			queue(async function(msg, ack){
 				if (msg.key !== message) return done('got a message I shouldnt have');
 				if (msg._exchange !== exchangeName) return done('bad _exchangeName');
 
-				ack(new Error(errorKey));
+				await ack(new Error(errorKey));
 
 				queue.destroy();
 				_readError();
@@ -224,10 +224,10 @@ describe('queue', function(){
 				name: errorQueueName,
 			});
 
-			errorQueue(function(msg, ack){
+			errorQueue(async function(msg, ack){
 				expect(msg._error).to.be.ok;
 				expect(msg._error.message).to.be.equal(errorKey);
-				ack();
+				await ack();
 
 				errorQueue.destroy();
 				done();
@@ -256,11 +256,11 @@ describe('queue', function(){
 				},
 			});
 
-			queue(function(msg, ack){
+			queue(async function(msg, ack){
 				if (msg.key !== message) return done('got a message I shouldnt have');
 				if (msg._exchange !== exchangeName) return done('bad _exchangeName');
 
-				ack(new Error(errorKey));
+				await ack(new Error(errorKey));
 
 				queue.destroy();
 				_readError();

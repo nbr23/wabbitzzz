@@ -328,7 +328,7 @@ function Queue(connString, params){
 						const myDone = (...args) => {
 							// generous timeouts and then restart the whole thing.
 							// TODO: try to reconnect instead of exiting
-							Promise.resolve(done.apply(null, args))
+							return Promise.resolve(done.apply(null, args))
 								.timeout(20000)
 								.catch(err => {
 									_log('error', 'our ack failed', err);
