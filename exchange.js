@@ -154,7 +154,7 @@ function Exchange(connString, params){
 			// console.log('assert', queueName);
 
 			promise = delayAssertChannel
-				.then(function(chan) {
+				.then(async function(chan) {
 
 					var options = {
 						exclusive: false,
@@ -172,16 +172,20 @@ function Exchange(connString, params){
 						options.arguments['x-rabbit-pal-remove'] = 'ignore';
 					}
 
+					console.log(`wabbitzzz delay_publish declare_queue begin: ${queueName}`, options);
+					await chan.assertQueue(queueName, options);
+					console.log(`wabbitzzz delay_publish declare_queue finish: ${queueName}`, options);
+
 					assertedQueues[queueName] = true;
-					return chan.assertQueue(queueName, options);
 				});
 		}
 
 		return promise
-			.then(function() {
-				return defaultExchangePublish(connString, msg, { key: queueName });
-			})
-			.then(function() {
+			.then(async function() {
+				console.log(`wabbitzzz delay_publish publish begin: ${queueName}`);
+				await defaultExchangePublish(connString, msg, { key: queueName });
+				console.log(`wabbitzzz delay_publish publish finish: ${queueName}`);
+
 				return true;
 			});
 	};
