@@ -137,6 +137,12 @@ function Exchange(connString, params){
 
 		// negative delays break things
 		var delay = Math.max(publishOptions.delay, 1);
+
+		if (_.isNaN(delay) || !_.isNumber(delay)) {
+			console.error(`wabbitzzz delay_publish delay is not a number. Forcing one minute delay: ${delay} ${exchangeName}`, publishOptions);
+			delay = 1000 * 60;
+		}
+
 		var queueName = 'delay_' + exchangeName  +'_by_'+publishOptions.delay+'__'+publishOptions.key;
 		var promise;
 
@@ -172,9 +178,9 @@ function Exchange(connString, params){
 						options.arguments['x-rabbit-pal-remove'] = 'ignore';
 					}
 
-					console.log(`wabbitzzz delay_publish declare_queue begin: ${queueName}`, options);
+					// console.log(`wabbitzzz delay_publish declare_queue begin: ${queueName}`, options);
 					await chan.assertQueue(queueName, options);
-					console.log(`wabbitzzz delay_publish declare_queue finish: ${queueName}`, options);
+					// console.log(`wabbitzzz delay_publish declare_queue finish: ${queueName}`, options);
 
 					assertedQueues[queueName] = true;
 				});
@@ -182,9 +188,9 @@ function Exchange(connString, params){
 
 		return promise
 			.then(async function() {
-				console.log(`wabbitzzz delay_publish publish begin: ${queueName}`);
+				// console.log(`wabbitzzz delay_publish publish begin: ${queueName}`);
 				await defaultExchangePublish(connString, msg, { key: queueName });
-				console.log(`wabbitzzz delay_publish publish finish: ${queueName}`);
+				// console.log(`wabbitzzz delay_publish publish finish: ${queueName}`);
 
 				return true;
 			});
