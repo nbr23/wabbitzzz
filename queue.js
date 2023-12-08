@@ -80,6 +80,8 @@ function Queue(connString, params){
 		closing = false,
 		exclusive = params.exclusive || false;
 
+	const isQuorumQueue = _.get(params, 'arguments.x-queue-type') === 'quorum';
+
 	if (exclusive) {
 		params.durable = false;
 	}
@@ -160,7 +162,15 @@ function Queue(connString, params){
 				})
 				.then(function(chan){
 					if (useErrorQueue){
-						return chan.assertQueue(errorQueueName, { durable: true })
+						const errorOptions = {
+							durable: true,
+						};
+
+						if (isQuorumQueue) {
+							errorOptions.arguments = { 'x-queue-type': 'quorum' };
+						}
+
+						return chan.assertQueue(errorQueueName, errorOptions)
 							.then(_.constant(chan));
 					}
 

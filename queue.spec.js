@@ -215,6 +215,50 @@ describe('queue', function(){
 			});
 		});
 	});
+	it('should be able to create a quorum queue with a quorum error queue', function(done){
+		this.timeout(5000);
+
+		const exchangeName = ezuuid();
+		const message = ezuuid();
+		const queueName = ezuuid();
+
+		const exchange1 = new Exchange({name: exchangeName, autoDelete: true});
+
+		exchange1.on('ready', function(){
+
+			var queue = new Queue({
+				name: queueName,
+				useErrorQueue: true,
+				arguments: {
+					'x-queue-type': 'quorum',
+				},
+				bindings: [
+					exchangeName,
+				],
+				ready: function(){
+					exchange1.publish({key:message});
+				},
+			});
+
+			queue(function(msg, ack){
+				ack(new Error());
+
+				const errorQueue = new Queue({
+					name: `${queueName}_error`,
+					arguments: { 'x-queue-type': 'quorum' },
+				});
+
+				errorQueue(async function(msg, ack){
+					expect(msg.key).to.be.equal(message);
+					await ack();
+					await queue.destroy();
+					await errorQueue.destroy();
+					done();
+				});
+			});
+
+		});
+	});
 	it('should be able to push errors to custom error queue', function(done){
 		this.timeout(8000);
 		const errorQueueName = ezuuid();
