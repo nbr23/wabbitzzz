@@ -42,8 +42,16 @@ function handleResponse(connString, response){
 
 	clearTimeout(requestEntry.timeout);
 
-	const msg = deserialize(response);
 	delete requestLookup[conn][correlationId];
+
+	let msg;
+	try {
+		msg = deserialize(response);
+	} catch (err) {
+		console.error('error deserializing response');
+		console.error(err);
+		return requestEntry.cb(err);
+	}
 
 	if (msg && msg._rpcError) {
 		requestEntry.cb(new Error(msg._message || 'unknown error in rpc server'));
