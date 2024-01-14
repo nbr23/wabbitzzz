@@ -80,7 +80,11 @@ function Queue(connString, params){
 		closing = false,
 		exclusive = params.exclusive || false;
 
-	const isQuorumQueue = _.get(params, 'arguments.x-queue-type') === 'quorum';
+	const isQuorumQueue = _.get(params, 'arguments.x-queue-type') === 'quorum' || params.useQuorum;
+
+	if (isQuorumQueue) {
+		params.arguments = { ...params.arguments, ...{ 'x-queue-type': 'quorum' } };
+	}
 
 	if (exclusive) {
 		params.durable = false;
