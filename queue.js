@@ -5,7 +5,7 @@ const Promise = require('bluebird');
 const getConnection = require('./get-connection');
 const { deserialize } = require('./serializer.js');
 
-const APP_NAME = process.env.APP_NAME || process.env.npm_package_name;
+const APP_NAME = process.env.APP_NAME || process.env.npm_package_name || 'UNKNOWN_APP';
 
 var EXCHANGE_ATTRIBUTE_NAMES = [
 	'durable',
@@ -72,7 +72,7 @@ function _patternToMatcher(pattern) {
 function Queue(connString, params){
 	params = _.extend({}, DEFAULTS, params);
 
-	var name = (params.name || ((params.namePrefix || 'no_name') + '.no_mirror.' + uuid())).replace(/\.APP_NAME\./g, `.${APP_NAME}.`),
+	var name = (params.name || ((params.namePrefix || 'no_name') + '.no_mirror.' + uuid())).replace(/(\b|_)(APP_NAME)(\b|_)/, `$1${APP_NAME}$3`),
 		useErrorQueue = !!params.useErrorQueue || _.isObject(params.errorQueue),
 		errorQueueName = _.get(params, 'errorQueue.name', `${name}_error`),
 		prefetchCount = params.prefetchCount|| 1,
