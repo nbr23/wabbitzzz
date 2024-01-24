@@ -20,6 +20,7 @@ var PUBLISH_DEFAULTS = {
 };
 
 var DELAYED_PUBLISH_DEFAULTS = {
+	persistent: true,
 	delay: 3000,
 	key: '',
 };
