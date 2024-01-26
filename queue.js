@@ -33,17 +33,6 @@ function _log(level, ...args) {
 	}
 }
 
-function assertQueue(connString, queueName, exchangeNames, params){
-	return getConnection(connString)
-		.then(function(conn){
-			return conn.createChannel();
-		})
-		.then(function(chan){
-			return chan.assertQueue(queueName, params)
-				.then(_.constant(chan));
-		});
-}
-
 function getNoAckParam(params){
 	if (params.noAck !== undefined && params.ack !== undefined){
 		throw new Error('cannot specifiy both ack and noAck params');
@@ -80,7 +69,8 @@ function Queue(connString, params){
 		noAck = getNoAckParam(params),
 		attempts = params.attempts,
 		closing = false,
-		exclusive = params.exclusive || false;
+		exclusive = params.exclusive || false,
+		durable = params.durable || false;
 
 	const isQuorumQueue = _.get(params, 'arguments.x-queue-type') === 'quorum' || params.useQuorum;
 
@@ -131,6 +121,222 @@ function Queue(connString, params){
 	delete params.ack;
 	delete params.exclusive;
 
+	async function _createChannel() {
+		const conn = await getConnection(connString)
+		const chan = await conn.createChannel();
+
+		chan.on('closed', function(){
+			console.log('queue channel closed');
+		});
+
+		chan.on('error', function(err){
+			console.log('queue channel errored', err?.message);
+		});
+
+		return chan;
+	}
+
+	let _restartConsumerAttempts = 0;
+	async function _restartConsumer(fn) {
+		ctag = null;
+
+		_log('warn', `WABBITZZZ restart consumer on queue '${name}'.`);
+
+		const connection = await getConnection(connString);
+		const channel = await connection.createChannel();
+		await channel.prefetch(prefetchCount);
+
+		channel.on('error', function(err){
+			console.log('_restartConsumer channel error', err.message);
+		});
+
+		try {
+			if (!durable) {
+				await _createQueue(channel, params);
+			}
+
+			const result = await _startConsumer(channel, fn, true);
+			ctag = result.consumerTag;
+			_log('success', `WABBITZZZ restart consumer on queue '${name}' succeeded in ${_restartConsumerAttempts} attempts`, ctag);
+			_restartConsumerAttempts = 0;
+		} catch (err) {
+			_restartConsumerAttempts += 1;
+			_log('warn', `WABBITZZZ restart consumer on queue '${name}' FAILED. Attempt #${_restartConsumerAttempts}.`);
+		}
+
+		if (ctag) {
+			return true;
+		}
+
+		setTimeout(() => {
+			_restartConsumer(fn);
+		}, _.random(1000, 5000));
+
+		return false;
+	}
+
+	async function _startConsumer(chan, fn, isRetry = false) {
+		const consumerOptions = {
+			exclusive,
+			noAck,
+		};
+
+		const consumeResult = await chan.consume(name, function(msg) {
+			if (msg === null){
+				// this means the queue has been cancelled. we should try re-consuming
+				_log('warn', `WABBITZZZ consumer on queue '${name}' was cancelled by the server.`);
+
+				ctag = null;
+				return _restartConsumer(fn);
+			}
+
+			if (closing) {
+				_log('warn', `channel for queue ${name} was closed before we could ACK` );
+				return false;
+			}
+			var myMessage;
+			try {
+
+				myMessage = deserialize(msg);
+
+				var retryDelay = 250;
+				var maxAttempts;
+
+				if (attempts) {
+					myMessage._attempt = myMessage._attempt || 0;
+
+					if (_.isArray(attempts)) {
+						maxAttempts = _.size(attempts) + 1;
+						retryDelay = attempts[myMessage._attempt];
+					} else {
+						maxAttempts = +attempts || 2;
+					}
+
+					if ((maxAttempts - 1) <= myMessage._attempt) {
+						myMessage._isFinalAttempt = true;
+					}
+				}
+
+
+				if (msg.properties){
+					if (msg.properties.replyTo) myMessage._replyTo = msg.properties.replyTo;
+					if (msg.properties.correlationId) myMessage._correlationId = msg.properties.correlationId;
+				}
+
+				if (msg.fields) {
+					const { routingKey } = msg.fields;
+
+					if (msg.fields.exchange) {
+						myMessage._exchange = msg.fields.exchange;
+						myMessage._routingKey = routingKey;
+					}
+
+					// there are potentially many matches, but we just use the first one. meh.
+					const matchedBinding = _.find(labeledBindings, b => {
+						// it is possible to apply the wrong label to a message if
+						// we do not specify the exchange
+						const isRightExchange = b.name === myMessage._exchange;
+						if (!isRightExchange) return false;
+
+						return b.isMatch && b.isMatch(routingKey);
+					});
+					if (matchedBinding) {
+						myMessage._label = matchedBinding.label;
+					}
+				}
+			} catch (err){
+				_log('error', 'error deserializing message', err);
+				myMessage = {};
+			}
+
+			var doneCalled = false;
+			var done = function(error){
+				if (noAck) return;
+
+				doneCalled = true;
+
+				if (!error) {
+					return chan.ack(msg);
+				}
+
+				myMessage._error = _.extend({}, {message: error.message, stack: error.stack}, error);
+
+				var pushToRetryQueue = false;
+
+				try {
+					if (attempts) {
+						myMessage._attempt = myMessage._attempt || 0;
+
+						myMessage._attempt += 1;
+
+						if (myMessage._attempt < maxAttempts) {
+							pushToRetryQueue = true;
+						}
+					}
+				} catch (err) {
+					_log('error', 'error while checking attempts', err);
+				}
+
+				if (pushToRetryQueue) {
+					return defaultExchangePublish(connString, myMessage, { delay: retryDelay, key: name })
+						.then(function(){
+							return chan.ack(msg);
+						});
+				} else if (useErrorQueue) {
+					var options = {
+						key: errorQueueName,
+						persistent: true,
+					};
+
+					return defaultExchangePublish(connString, myMessage, options)
+						.then(function(){
+							return chan.ack(msg);
+						})
+						.catch(function(publishError){
+							_log('error', 'wabbitzzz, defaultExchangePublish error', error);
+							_log('error', 'wabbitzzz, defaultExchangePublish publishError', publishError);
+
+							throw publishError;
+						});
+				} else {
+					_log('error', 'bad ack', error);
+					return Promise.resolve(false);
+				}
+			};
+
+			try {
+				const myDone = (...args) => {
+					// generous timeouts and then restart the whole thing.
+					// TODO: try to reconnect instead of exiting
+					return Promise.resolve(done.apply(null, args))
+						.timeout(20000)
+						.catch(err => {
+							_log('error', 'our ack failed', err);
+
+							return Promise.resolve(chan.nack(msg))
+								.timeout(20000)
+								.catch(err => {
+									_log('our ack failed, then our nack failed', err);
+									process.exit(1);
+								});
+						});
+				};
+
+				fn(myMessage, myDone);
+			} catch (e){
+				if (!doneCalled){
+					done(e.toString());
+				}
+			}
+		}, consumerOptions);
+
+		if (isRetry) {
+			_log('success', `WABBITZZZ consuming queue '${name}'.`, consumeResult.consumerTag);
+		}
+
+		return consumeResult;
+	}
+
 	function bindQueue(chan, bindings){
 		return _.chain(bindings)
 			.toArray()
@@ -153,61 +359,73 @@ function Queue(connString, params){
 			.then(_.constant(chan));
 	}
 
-	var queuePromise = assertQueue(connString, name, bindings, params)
-		.then(function(chan){
-			chan.on('error', function(err){
-				_log('error', '------------------------');
-				_log('error', 'error binding ' + name, err.message);
-				_log('error', err);
-				_log('error', '========================');
-			});
+	async function _createQueue(chan, params, isRetry = false) {
+		await chan.assertQueue(name, params);
 
-			return Promise.resolve(true)
-				.then(function(){
-					return chan;
-				})
-				.then(function(chan){
-					if (useErrorQueue){
-						const errorOptions = {
-							durable: true,
-						};
+		if (useErrorQueue){
+			const errorOptions = {
+				durable: true,
+			};
 
-						if (isQuorumQueue) {
-							errorOptions.arguments = { 'x-queue-type': 'quorum' };
-						}
+			if (isQuorumQueue) {
+				errorOptions.arguments = { 'x-queue-type': 'quorum' };
+			}
 
-						return chan.assertQueue(errorQueueName, errorOptions)
-							.then(_.constant(chan));
-					}
+			await chan.assertQueue(errorQueueName, errorOptions)
+		}
 
-					return chan;
-				})
-				.then(function(chan){
-					return chan.prefetch(prefetchCount)
-						.then(_.constant(chan));
-				})
-				.then(function(chan) {
-					return bindQueue(chan, bindings);
-				})
-				.then(function(chan){
-					if (_.isFunction(params.ready)) {
-						params.ready();
-					}
+		await chan.prefetch(prefetchCount)
+		await bindQueue(chan, bindings);
 
-					return chan;
-				})
-				.catch(function(err){
-					_log('error', 'assertQueue', err);
-					return false;
-				});
-		});
+		if (_.isFunction(params.ready)) {
+			params.ready();
+		}
+
+		if (isRetry) {
+			_log('success', `WABBITZZZ created queue '${name}'.`);
+		}
+	}
+
+	async function _ensureQueue(isRetry = false){
+		const chan = await _createChannel();
+
+		try {
+			await _createQueue(chan, params, isRetry);
+		} catch (err) {
+			_log('error', 'unable to ensure queue', err.code, err);
+
+			switch (err.code) {
+				case 406: {
+					_log('warn', `queue ${name} fatal 406. ending.`);
+					return _die(err);
+				}
+				case 404: {
+					_log('warn', `queue ${name} not found, retrying...`);
+					await Promise.delay(_.random(1000, 5000));
+					return _ensureQueue(true);
+				}
+				default: {
+					throw err;
+				}
+			}
+		}
+
+		return chan;
+	}
+
+	async function _die(err){
+		const connection = await getConnection(connString)
+		await connection.close();
+	}
+
+	var queuePromise = _ensureQueue();
 
 	var receiveFunc = function(fn){
 		return queuePromise
 			.then(function(chan){
 				if (!chan) {
-					_log('warn', `missing channel for queue ${name} not consuming`);
-					return false;
+					_log('error', `missing channel for queue ${name} not consuming`);
+					throw new Error(`missing channel for queue ${name} not consuming`);
 				}
 
 				if (closing) {
@@ -215,156 +433,7 @@ function Queue(connString, params){
 					return false;
 				}
 
-				const consumerOptions = {
-					exclusive,
-					noAck,
-				};
-
-				return chan.consume(name, function(msg) {
-					if (!msg){
-						// this means the queue has been cancelled.
-						return false;
-					}
-
-					if (closing) {
-						_log('warn', `channel for queue ${name} was closed before we could ACK` );
-						return false;
-					}
-					var myMessage;
-					try {
-
-						myMessage = deserialize(msg);
-
-						var retryDelay = 250;
-						var maxAttempts;
-
-						if (attempts) {
-							myMessage._attempt = myMessage._attempt || 0;
-
-							if (_.isArray(attempts)) {
-								maxAttempts = _.size(attempts) + 1;
-								retryDelay = attempts[myMessage._attempt];
-							} else {
-								maxAttempts = +attempts || 2;
-							}
-
-							if ((maxAttempts - 1) <= myMessage._attempt) {
-								myMessage._isFinalAttempt = true;
-							}
-						}
-
-
-						if (msg.properties){
-							if (msg.properties.replyTo) myMessage._replyTo = msg.properties.replyTo;
-							if (msg.properties.correlationId) myMessage._correlationId = msg.properties.correlationId;
-						}
-
-						if (msg.fields) {
-							const { routingKey } = msg.fields;
-
-							if (msg.fields.exchange) {
-								myMessage._exchange = msg.fields.exchange;
-								myMessage._routingKey = routingKey;
-							}
-
-							// there are potentially many matches, but we just use the first one. meh.
-							const matchedBinding = _.find(labeledBindings, b => {
-								// it is possible to apply the wrong label to a message if
-								// we do not specify the exchange
-								const isRightExchange = b.name === myMessage._exchange;
-								if (!isRightExchange) return false;
-
-								return b.isMatch && b.isMatch(routingKey);
-							});
-							if (matchedBinding) {
-								myMessage._label = matchedBinding.label;
-							}
-						}
-					} catch (err){
-						_log('error', 'error deserializing message', err);
-						myMessage = {};
-					}
-
-					var doneCalled = false;
-					var done = function(error){
-						if (noAck) return;
-
-						doneCalled = true;
-
-						if (!error) {
-							return chan.ack(msg);
-						}
-
-						myMessage._error = _.extend({}, {message: error.message, stack: error.stack}, error);
-
-						var pushToRetryQueue = false;
-
-						try {
-							if (attempts) {
-								myMessage._attempt = myMessage._attempt || 0;
-
-								myMessage._attempt += 1;
-
-								if (myMessage._attempt < maxAttempts) {
-									pushToRetryQueue = true;
-								}
-							}
-						} catch (err) {
-							_log('error', 'error while checking attempts', err);
-						}
-
-						if (pushToRetryQueue) {
-							return defaultExchangePublish(connString, myMessage, { delay: retryDelay, key: name })
-								.then(function(){
-									return chan.ack(msg);
-								});
-						} else if (useErrorQueue) {
-							var options = {
-								key: errorQueueName,
-								persistent: true,
-							};
-
-							return defaultExchangePublish(connString, myMessage, options)
-								.then(function(){
-									return chan.ack(msg);
-								})
-								.catch(function(publishError){
-									_log('error', 'wabbitzzz, defaultExchangePublish error', error);
-									_log('error', 'wabbitzzz, defaultExchangePublish publishError', publishError);
-
-									throw publishError;
-								});
-						} else {
-							_log('error', 'bad ack', error);
-							return Promise.resolve(false);
-						}
-					};
-
-					try {
-						const myDone = (...args) => {
-							// generous timeouts and then restart the whole thing.
-							// TODO: try to reconnect instead of exiting
-							return Promise.resolve(done.apply(null, args))
-								.timeout(20000)
-								.catch(err => {
-									_log('error', 'our ack failed', err);
-
-									return Promise.resolve(chan.nack(msg))
-										.timeout(20000)
-										.catch(err => {
-											_log('our ack failed, then our nack failed', err);
-											process.exit(1);
-										});
-								});
-						};
-
-						fn(myMessage, myDone);
-					} catch (e){
-						if (!doneCalled){
-							done(e.toString());
-						}
-					}
-				}, consumerOptions);
+				return _startConsumer(chan, fn, false);
 			})
 			.then(function(res){
 				ctag = res.consumerTag;

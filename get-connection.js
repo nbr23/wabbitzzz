@@ -1,7 +1,17 @@
+const _ = require('lodash');
 const { version } = require('./package.json');
 const CONN_STRING = process.env.WABBITZZZ_URL || 'amqp://localhost';
 const amqplib = require('amqplib');
 const Promise = require('bluebird');
+
+// ECONNREFUSED is can be somehow uncatchable ?!?!?
+process.on('unhandledRejection', (reason, p) => {
+	console.error('wabbitzzz Unhandled Rejection at: Promise', p, 'reason:', reason);
+	setTimeout(function() {
+		_log(`unhandledRejection EXITING NOW.`);
+		process.exit(1);
+	}, _.random(2000, 5000));
+});
 
 const DEFAULT_CONNECTION_PARAMS = {
 	clientProperties: {
@@ -20,7 +30,8 @@ function _log(...args) {
 }
 
 function _getConnection(connString = CONN_STRING){
-	return Promise.resolve(amqplib.connect(connString, DEFAULT_CONNECTION_PARAMS))
+	return Promise.resolve()
+		.then(() => amqplib.connect(connString, DEFAULT_CONNECTION_PARAMS))
 		.then(function(conn) {
 			_log('WABBITZZZ CONNECTION OPENED');
 
@@ -41,7 +52,7 @@ function _getConnection(connString = CONN_STRING){
 				setTimeout(function() {
 					_log(`connection closed EXITING NOW.`);
 					process.exit(1);
-				}, 5000);
+				}, _.random(2000, 5000));
 			});
 
 			conn.on('error', err => {
@@ -57,7 +68,7 @@ function _getConnection(connString = CONN_STRING){
 			setTimeout(function() {
 				_log(`unable to get connect EXITING NOW: ${err.message}`);
 				process.exit(1);
-			}, 5000);
+			}, _.random(2000, 5000));
 
 			throw err;
 		});
