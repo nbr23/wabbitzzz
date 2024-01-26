@@ -465,13 +465,18 @@ function Queue(connString, params){
 		closing = true;
 
 		return queuePromise
-			.then(function(chan){
-				return chan.deleteQueue(name)
-					.then(_.constant(chan))
-					.catch(err => {
-						_log(`error`, `unable to delete queue ${name}`, err);
-						return chan;
-					});
+			.then(async function(chan){
+				try {
+					if (ctag) {
+						await chan.cancel(ctag);
+					}
+
+					await chan.deleteQueue(name)
+					return chan;
+				} catch (err) {
+					_log(`error`, `unable to delete queue ${name}`, err);
+					return chan;
+				}
 			})
 			.then(function(chan){
 				return chan.close();
