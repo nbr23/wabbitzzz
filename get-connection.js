@@ -4,13 +4,22 @@ const CONN_STRING = process.env.WABBITZZZ_URL || 'amqp://localhost';
 const amqplib = require('amqplib');
 const Promise = require('bluebird');
 
-// ECONNREFUSED is can be somehow uncatchable ?!?!?
 process.on('unhandledRejection', (reason, p) => {
-	console.error('wabbitzzz Unhandled Rejection at: Promise', p, 'reason:', reason);
-	setTimeout(function() {
-		_log(`unhandledRejection EXITING NOW.`);
-		process.exit(1);
-	}, _.random(2000, 5000));
+	// ECONNREFUSED is can be uncatchable somehow depending on node version ?!?!?
+	const errorText = _.get(reason, 'message', '');
+	const isECONNREFUSED = /ECONNREFUSED/.test(errorText);
+
+	if (isECONNREFUSED) {
+		const delay = _.random(2000, 5000);
+
+		_log(`ECONNREFUSED EXITING FOUND. Exiting in ${delay}ms.`);
+		setTimeout(function() {
+			_log(`ECONNREFUSED EXITING NOW.`);
+			process.exit(1);
+		}, delay);
+	} else {
+		_log('Unhandled Rejection at: Promise', p, 'reason:', reason);
+	}
 });
 
 const DEFAULT_CONNECTION_PARAMS = {
@@ -23,9 +32,9 @@ const DEFAULT_CONNECTION_PARAMS = {
 
 function _log(...args) {
 	if (global.logger && global.logger.warn) {
-		global.logger.warn.apply(global.logger, args);
+		global.logger.warn.apply(global.logger, ['WABBITZZZ', ...args]);
 	} else {
-		console.warn.apply(console, args);
+		console.warn.apply(console, ['WABBITZZZ', ...args]);
 	}
 }
 
@@ -33,7 +42,7 @@ function _getConnection(connString = CONN_STRING){
 	return Promise.resolve()
 		.then(() => amqplib.connect(connString, DEFAULT_CONNECTION_PARAMS))
 		.then(function(conn) {
-			_log('WABBITZZZ CONNECTION OPENED');
+			_log('CONNECTION OPENED');
 
 			var closed = false;
 			function close(){
@@ -48,7 +57,7 @@ function _getConnection(connString = CONN_STRING){
 
 			process.once('SIGINT', close);
 			conn.on('close', closeData => {
-				_log('WABBITZZZ CONNECTION CLOSED', closeData);
+				_log('CONNECTION CLOSED', closeData);
 				setTimeout(function() {
 					_log(`connection closed EXITING NOW.`);
 					process.exit(1);
@@ -56,7 +65,7 @@ function _getConnection(connString = CONN_STRING){
 			});
 
 			conn.on('error', err => {
-				_log('WABBITZZZ CONNECTION ERRROR', err);
+				_log('CONNECTION ERRROR', err);
 			});
 
 			return conn;
