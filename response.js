@@ -92,13 +92,11 @@ function response (connString){
 					return;
 				}
 
-				const contentType = _.get(rawMsg, 'properties.contentType', 'application/json');
 				const done = function(err, res){
 					const publishOptions = {
 						persistent: false,
 						key: rawMsg.properties.replyTo,
 						correlationId: rawMsg.properties.correlationId,
-						contentType,
 					};
 
 					const conn = connString ? connString : 'main';
@@ -119,7 +117,6 @@ function response (connString){
 					msg = {};
 					console.log(`deserialization error while processing ${methodName}`);
 				}
-
 
 				try {
 					// this is not strictly necessary, but helps avoid bugs for the moment

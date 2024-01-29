@@ -1,7 +1,7 @@
 const getConnection = require('./get-connection');
 const ezuuid = require('ezuuid');
 const _ = require('lodash');
-const { serialize, deserialize } = require('./serializer.js');
+const { deserialize } = require('./serializer.js');
 
 function initChannel (connString) {
 	return getConnection(connString)
@@ -104,16 +104,15 @@ function request (connString){
 					return cb(new Error('unable to initialize rpc channel'));
 				}
 
-				const contentType = 'application/msgpack';
 				var options = {
 					key: methodName,
 					correlationId: correlationId,
 					persistent: false,
 					replyTo: 'amq.rabbitmq.reply-to',
-					contentType,
+					contentType: 'application/json',
 				};
 
-				return chan.publish('_rpc_send_direct', methodName, serialize(req, contentType), options);
+				return chan.publish('_rpc_send_direct', methodName, new Buffer(JSON.stringify(req)), options);
 			})
 			.then(function(){
 				requestEntry.timeout = setTimeout(function(){
