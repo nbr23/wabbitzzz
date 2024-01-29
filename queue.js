@@ -183,10 +183,16 @@ function Queue(connString, params){
 
 		const consumeResult = await chan.consume(name, function(msg) {
 			if (msg === null){
+
 				// this means the queue has been cancelled. we should try re-consuming
 				_log('warn', `WABBITZZZ consumer on queue '${name}' was cancelled by the server.`);
 
 				ctag = null;
+
+				if (_.isFunction(params.onConsumerCancelled)) {
+					params.onConsumerCancelled();
+				}
+
 				return _restartConsumer(fn);
 			}
 
