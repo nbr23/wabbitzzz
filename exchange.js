@@ -16,7 +16,7 @@ var EXCHANGE_DEFAULTS = {
 
 var PUBLISH_DEFAULTS = {
 	persistent: true,
-	contentType: 'application/json',
+	contentType: 'application/msgpack',
 };
 
 var DELAYED_PUBLISH_DEFAULTS = {
