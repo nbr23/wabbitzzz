@@ -183,6 +183,9 @@ function Queue(connString, params){
 
 		const consumeResult = await chan.consume(name, function(msg) {
 			if (msg === null){
+				if (closing) {
+					return
+				}
 
 				// this means the queue has been cancelled. we should try re-consuming
 				_log('warn', `WABBITZZZ consumer on queue '${name}' was cancelled by the server.`);
