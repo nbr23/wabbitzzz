@@ -8,7 +8,7 @@
     "testing": "nodemon mocha queue.spec.js"
   },
   "author": "",
-  "license": "none",
+  "license": "MIT",
   "dependencies": {
     "amqplib": "^0.10.3",
     "bluebird": "^3.4.1",
