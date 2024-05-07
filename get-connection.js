@@ -25,6 +25,7 @@ process.on('unhandledRejection', (reason, p) => {
 const DEFAULT_CONNECTION_PARAMS = {
 	clientProperties: {
 		information: process.env.APP_NAME || process.env.npm_package_name,
+		connection_name: process.env.APP_NAME || process.env.npm_package_name,
 		product: `wabbitzzz v${version}`,
 		version: '',
 	},
