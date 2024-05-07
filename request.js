@@ -108,6 +108,7 @@ function request (connString){
 				var options = {
 					key: methodName,
 					correlationId: correlationId,
+					appId: process.env.APP_NAME || process.env.npm_package_name,
 					persistent: false,
 					replyTo: 'amq.rabbitmq.reply-to',
 					contentType,
