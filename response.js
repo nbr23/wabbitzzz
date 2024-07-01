@@ -117,18 +117,16 @@ function response (connString){
 					msg = deserialize(rawMsg);
 				} catch (err) {
 					msg = {};
-					console.log(`deserialization error while processing ${methodName}`);
+					console.log(`wabbitzzz: deserialization error while processing ${methodName}`);
 				}
-
 
 				try {
 					// this is not strictly necessary, but helps avoid bugs for the moment
 					delete msg._exchange;
+
 					cb(null, msg, done);
 				} catch (err){
-					console.log('unhandled error while processing ' + methodName);
-					console.error(err);
-					cb(err);
+					console.error('wabbitzzz: unhandled error while processing ', methodName, err);
 				}
 			}, { noAck: true });
 
@@ -138,6 +136,7 @@ function response (connString){
 				console.log(`RESUMED ${methodName} consumer`);
 			}
 		} catch (err) {
+			console.error(`wabbitzzz: error consuming ${methodName} queue`, err);
 			setTimeout(() => {
 				consume(null, cb);
 			}, _.random(1000, 5000));
