@@ -48,7 +48,13 @@ function getNoAckParam(params){
 function _patternToMatcher(pattern) {
 	if (!pattern) return _.constant(false);
 	// https://github.com/mateodelnorte/amqp-match/blob/master/index.js
-	const regexString = '^' + pattern.replace(/\*/g, '([^.]+)').replace(/#/g, '([^.]+.?)+') + '$';
+	const regexString = '^' +
+		pattern.replace(/[.]/g, '\\.') // escape dots
+			.replace(/\*/g, '([^.]+)') // single word wildcard
+			.replace(/^#\\./, '([^.]+[.])*') // multi word wildcard at start of key
+			.replace(/\\.#$/, '([.][^.]+)*') // multi word wildcard at end of key
+			.replace(/\\.#\\./g, '(([.].*[.])*|[.])') // multi word wildcard within key
+		+ '$';
 
 	return function(str) {
 		if (!str) return false;
