@@ -383,8 +383,12 @@ function Queue(connString, params){
 				durable: true,
 			};
 
+			if (_.isObject(params.errorQueue)) {
+				errorOptions.arguments = params.errorQueue.arguments;
+			}
+
 			if (isQuorumQueue) {
-				errorOptions.arguments = { 'x-queue-type': 'quorum' };
+				errorOptions.arguments = { ...errorOptions.arguments, 'x-queue-type': 'quorum' };
 			}
 
 			await chan.assertQueue(errorQueueName, errorOptions)
