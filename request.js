@@ -119,7 +119,7 @@ function request (connString){
 			.then(function(){
 				requestEntry.timeout = setTimeout(function(){
 					delete requestLookup[conn][correlationId];
-					cb(new Error('timeout'));
+					cb(new Error(`timeout on ${methodName}`));
 				}, options.timeout);
 			})
 			.catch(function(err){

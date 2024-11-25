@@ -58,7 +58,7 @@ describe('rpc', function(){
 
 		request(METHOD_NAME, {timeout: 100})({msg: 'goodbye cruel world'}, function(err){
 			expect(err).to.be.ok;
-			expect(err.message).to.be.equal('timeout');
+			expect(err.message).to.be.equal(`timeout on ${METHOD_NAME}`);
 
 			if (err) return done();
 
