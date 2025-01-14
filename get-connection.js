@@ -53,24 +53,29 @@ function _getConnection(connString = CONN_STRING){
 					return;
 				}
 
-				const cancelConsumersPromises = channels.flatMap((channelObj) => {
-					const channel = channelObj?.channel;
-					if (channel?.consumers?.size > 0) {
-						const consumerTags = Array.from(channel.consumers.keys());
-						return consumerTags.map(async (consumerTag) => { // global bluebird interferes with Promise.allSettled in some apps so explicitly return resolved values
-							return channel.cancel(consumerTag)
-								.then((value) => ({status: 'fulfilled', consumerTag, value }))
-								.catch((err) => ({status: 'rejected', consumerTag, reason: err}));
-						});
-					}
+				const cancelConsumersResults = await Promise.resolve(channels)
+					.mapSeries(async (channelObj) => {
+						const channel = channelObj?.channel;
+						if (channel?.consumers?.size > 0) {
+							const consumerTags = Array.from(channel.consumers.keys());
+							return Promise.resolve(consumerTags)
+								.mapSeries(async (consumerTag) => {
+									return channel.cancel(consumerTag)
+										.then(() => ({succeeded: true, consumerTag }))
+										.catch((err) => ({succeeded: false, consumerTag, reason: err}));
+								});
+						}
 
-					return [];
-				});
-
-				const cancelConsumersResults = await Promise.all(cancelConsumersPromises);
+						return [];
+					})
+					.then((results) => results.flat())
+					.catch((err) => {
+						_log('error cancelling consumers', err);
+						return [];
+					});
 
 				cancelConsumersResults.forEach(res => {
-					if (res.status === 'rejected') {
+					if (!res.succeeded) {
 						_log(`Error cancelling consumer: ${res.consumerTag} ${res.reason}`);
 					} else {
 						_log(`Cancelled consumer with consumer tag ${res.consumerTag}`);
