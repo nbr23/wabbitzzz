@@ -45,6 +45,48 @@ function _getConnection(connString = CONN_STRING){
 		.then(function(conn) {
 			_log('CONNECTION OPENED');
 
+			const cancelAllConsumers = async () => {
+				_log('cancelAllConsumers called');
+				const channels = conn.connection?.channels;
+				if (!channels || channels.length === 0) {
+					_log('no channels found when attempting to cancel all consumers');
+					return;
+				}
+
+				const cancelConsumersPromises = channels.flatMap((channelObj) => {
+					const channel = channelObj?.channel;
+					if (channel?.consumers?.size > 0) {
+						const consumerTags = Array.from(channel.consumers.keys());
+						return consumerTags.map(async (consumerTag) => { // global bluebird interferes with Promise.allSettled in some apps so explicitly return resolved values
+							return channel.cancel(consumerTag)
+								.then((value) => ({status: 'fulfilled', consumerTag, value }))
+								.catch((err) => ({status: 'rejected', consumerTag, reason: err}));
+						});
+					}
+
+					return [];
+				});
+
+				const cancelConsumersResults = await Promise.all(cancelConsumersPromises);
+
+				cancelConsumersResults.forEach(res => {
+					if (res.status === 'rejected') {
+						_log(`Error cancelling consumer: ${res.consumerTag} ${res.reason}`);
+					} else {
+						_log(`Cancelled consumer with consumer tag ${res.consumerTag}`);
+					}
+				});
+
+				return cancelConsumersResults;
+			};
+
+			const stopConsumingAndClose = async () => {
+				_log('signal received. stopping consuming before closing connection');
+				await cancelAllConsumers();
+				await new Promise(resolve => setTimeout(resolve, 10 * 1000));
+				close();
+			};
+
 			var closed = false;
 			function close(){
 				if (closed){
@@ -56,7 +98,8 @@ function _getConnection(connString = CONN_STRING){
 				conn.close();
 			}
 
-			process.once('SIGINT', close);
+			process.once('SIGTERM', stopConsumingAndClose);
+			process.once('SIGINT', stopConsumingAndClose);
 			conn.on('close', closeData => {
 				_log('CONNECTION CLOSED', closeData);
 				setTimeout(function() {
