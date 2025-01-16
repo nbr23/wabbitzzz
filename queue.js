@@ -81,6 +81,8 @@ function Queue(connString, params){
 
 	const isQuorumQueue = _.get(params, 'arguments.x-queue-type') === 'quorum' || params.useQuorum;
 
+	const consumerArgs = _.get(params, 'consumer.arguments', {});
+
 	if (isQuorumQueue) {
 		params.arguments = { ...params.arguments, ...{ 'x-queue-type': 'quorum' } };
 	}
@@ -186,6 +188,7 @@ function Queue(connString, params){
 		const consumerOptions = {
 			exclusive,
 			noAck,
+			arguments: consumerArgs,
 		};
 
 		const consumeResult = await chan.consume(name, function(msg) {
